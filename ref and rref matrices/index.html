@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nhận diện ma trận bậc thang</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- MathJax CDN -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <!-- math.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/10.6.4/math.min.js"></script>
+  <style>
+    canvas {
+      border: 1px solid #000;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-100 font-sans">
+  <div class="container mx-auto p-4 max-w-4xl">
+    <h1 class="text-3xl font-bold text-center mb-6">Nhận diện ma trận bậc thang</h1>
+
+    <!-- Nhập kích thước ma trận -->
+    <div class="mb-4">
+      <label class="block text-lg font-medium mb-2">Kích thước ma trận:</label>
+      <div class="flex space-x-4">
+        <input id="rows" type="number" min="1" value="3" class="border p-2 rounded w-20" placeholder="Hàng">
+        <span class="text-lg">×</span>
+        <input id="cols" type="number" min="1" value="3" class="border p-2 rounded w-20" placeholder="Cột">
+        <button onclick="createMatrixInput()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Tạo ma
+          trận</button>
+      </div>
+    </div>
+
+    <!-- Nhập ma trận -->
+    <div id="matrix-input" class="mb-4"></div>
+
+    <!-- Nút kiểm tra -->
+    <button onclick="checkMatrix()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 mb-4">Kiểm tra
+      ma trận</button>
+
+    <!-- Kết quả -->
+    <div id="result" class="mb-4 text-lg"></div>
+
+    <!-- Hiển thị ma trận bằng MathJax -->
+    <div id="matrix-display" class="mb-4"></div>
+
+    <!-- Canvas để vẽ ma trận -->
+    <canvas id="matrix-canvas" class="mx-auto"></canvas>
+  </div>
+
+  <script>
+    // Tạo bảng nhập liệu ma trận
+    function createMatrixInput() {
+      const rows = parseInt(document.getElementById('rows').value);
+      const cols = parseInt(document.getElementById('cols').value);
+      const matrixInput = document.getElementById('matrix-input');
+      matrixInput.innerHTML = '';
+
+      let html = '<div class="grid gap-2" style="grid-template-columns: repeat(' + cols + ', minmax(0, 1fr));">';
+      for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+          html += `<input type="number" id="cell-${i}-${j}" value="0" class="border p-2 rounded text-center">`;
+        }
+      }
+      html += '</div>';
+      matrixInput.innerHTML = html;
+      document.getElementById('result').innerHTML = '';
+      document.getElementById('matrix-display').innerHTML = '';
+      clearCanvas();
+    }
+
+    // Lấy dữ liệu ma trận từ input
+    function getMatrix() {
+      const rows = parseInt(document.getElementById('rows').value);
+      const cols = parseInt(document.getElementById('cols').value);
+      let matrix = [];
+      for (let i = 0; i < rows; i++) {
+        let row = [];
+        for (let j = 0; j < cols; j++) {
+          const value = parseFloat(document.getElementById(`cell-${i}-${j}`).value) || 0;
+          row.push(value);
+        }
+        matrix.push(row);
+      }
+      return matrix;
+    }
+
+    // Kiểm tra ma trận bậc thang (REF)
+    function isRowEchelonForm(matrix) {
+      const rows = matrix.length;
+      const cols = matrix[0].length;
+      let prevPivotCol = -1;
+
+      for (let i = 0; i < rows; i++) {
+        let pivotCol = -1;
+        for (let j = 0; j < cols; j++) {
+          if (Math.abs(matrix[i][j]) > 1e-10) {
+            pivotCol = j;
+            break;
+          }
+        }
+
+        if (pivotCol === -1) {
+          for (let j = 0; j < cols; j++) {
+            if (Math.abs(matrix[i][j]) > 1e-10) return false;
+          }
+          continue;
+        }
+
+        if (pivotCol <= prevPivotCol) return false;
+        prevPivotCol = pivotCol;
+
+        for (let k = i + 1; k < rows; k++) {
+          if (Math.abs(matrix[k][pivotCol]) > 1e-10) return false;
+        }
+      }
+      return true;
+    }
+
+    // Kiểm tra ma trận bậc thang rút gọn (RREF)
+    function isReducedRowEchelonForm(matrix) {
+      const rows = matrix.length;
+      const cols = matrix[0].length;
+      let prevPivotCol = -1;
+
+      for (let i = 0; i < rows; i++) {
+        let pivotCol = -1;
+        for (let j = 0; j < cols; j++) {
+          if (Math.abs(matrix[i][j]) > 1e-10) {
+            pivotCol = j;
+            break;
+          }
+        }
+
+        if (pivotCol === -1) {
+          for (let j = 0; j < cols; j++) {
+            if (Math.abs(matrix[i][j]) > 1e-10) return false;
+          }
+          continue;
+        }
+
+        if (Math.abs(matrix[i][pivotCol] - 1) > 1e-10) return false;
+        if (pivotCol <= prevPivotCol) return false;
+        prevPivotCol = pivotCol;
+
+        for (let k = 0; k < rows; k++) {
+          if (k !== i && Math.abs(matrix[k][pivotCol]) > 1e-10) return false;
+        }
+      }
+      return true;
+    }
+
+    // Giải thích tại sao không phải RREF
+    function explainNotRREF(matrix) {
+      const rows = matrix.length;
+      const cols = matrix[0].length;
+      let reasons = [];
+
+      for (let i = 0; i < rows; i++) {
+        let pivotCol = -1;
+        for (let j = 0; j < cols; j++) {
+          if (Math.abs(matrix[i][j]) > 1e-10) {
+            pivotCol = j;
+            break;
+          }
+        }
+
+        if (pivotCol === -1) {
+          for (let j = 0; j < cols; j++) {
+            if (Math.abs(matrix[i][j]) > 1e-10) {
+              reasons.push(`Hàng ${i + 1} có phần tử khác 0 (${matrix[i][j]} tại cột ${j + 1}) dù không có pivot hợp lệ.`);
+            }
+          }
+          continue;
+        }
+
+        if (Math.abs(matrix[i][pivotCol] - 1) > 1e-10) {
+          reasons.push(`Pivot tại hàng ${i + 1}, cột ${pivotCol + 1} có giá trị ${matrix[i][pivotCol]} ≠ 1.`);
+        }
+
+        for (let k = 0; k < rows; k++) {
+          if (k !== i && Math.abs(matrix[k][pivotCol]) > 1e-10) {
+            reasons.push(`Cột ${pivotCol + 1} có phần tử khác 0 (${matrix[k][pivotCol]} tại hàng ${k + 1}) ngoài pivot.`);
+          }
+        }
+      }
+
+      return reasons.length > 0 ? reasons : ['Không tìm thấy lý do cụ thể, nhưng ma trận không thỏa mãn RREF.'];
+    }
+
+    // Tìm các pivot trong ma trận
+    function findPivots(matrix) {
+      const rows = matrix.length;
+      const cols = matrix[0].length;
+      let pivots = []; // Mảng chứa [row, col] của các pivot
+      let prevPivotCol = -1;
+
+      for (let i = 0; i < rows; i++) {
+        let pivotCol = -1;
+        for (let j = 0; j < cols; j++) {
+          if (Math.abs(matrix[i][j]) > 1e-10) {
+            pivotCol = j;
+            break;
+          }
+        }
+        if (pivotCol !== -1 && pivotCol > prevPivotCol) {
+          pivots.push([i, pivotCol]);
+          prevPivotCol = pivotCol;
+        }
+      }
+      return pivots;
+    }
+
+    // Hiển thị ma trận bằng MathJax
+    function displayMatrix(matrix) {
+      const matrixDisplay = document.getElementById('matrix-display');
+      let tex = '\\begin{bmatrix} ';
+      for (let i = 0; i < matrix.length; i++) {
+        for (let j = 0; j < matrix[0].length; j++) {
+          tex += matrix[i][j];
+          if (j < matrix[0].length - 1) tex += ' & ';
+        }
+        if (i < matrix.length - 1) tex += ' \\\\ ';
+      }
+      tex += ' \\end{bmatrix}';
+      matrixDisplay.innerHTML = `\\(${tex}\\)`; // Đặt nội dung MathJax
+      MathJax.typeset(); // Render lại MathJax
+    }
+
+    // Vẽ ma trận lên Canvas với highlight pivot
+    function drawMatrix(matrix) {
+      const canvas = document.getElementById('matrix-canvas');
+      const ctx = canvas.getContext('2d');
+      const rows = matrix.length;
+      const cols = matrix[0].length;
+
+      // Thiết lập kích thước canvas
+      const cellSize = 50;
+      canvas.width = cols * cellSize + 20;
+      canvas.height = rows * cellSize + 20;
+
+      // Xóa canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Tìm các pivot
+      const pivots = findPivots(matrix);
+
+      // Vẽ lưới ma trận
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1;
+      ctx.font = '16px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+          // Kiểm tra xem ô có phải là pivot không
+          const isPivot = pivots.some(pivot => pivot[0] === i && pivot[1] === j);
+          if (isPivot) {
+            // Tô màu vàng cho pivot
+            ctx.fillStyle = '#FFFF99'; // Màu vàng nhạt
+            ctx.fillRect(j * cellSize + 10, i * cellSize + 10, cellSize, cellSize);
+          }
+          // Vẽ viền ô
+          ctx.strokeStyle = '#000';
+          ctx.strokeRect(j * cellSize + 10, i * cellSize + 10, cellSize, cellSize);
+          // Vẽ giá trị
+          ctx.fillStyle = '#000'; // Màu chữ đen
+          ctx.fillText(matrix[i][j], j * cellSize + 10 + cellSize / 2, i * cellSize + 10 + cellSize / 2);
+        }
+      }
+
+      // Vẽ dấu ngoặc ma trận
+      ctx.beginPath();
+      ctx.moveTo(5, 10);
+      ctx.lineTo(5, canvas.height - 10);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(canvas.width - 5, 10);
+      ctx.lineTo(canvas.width - 5, canvas.height - 10);
+      ctx.stroke();
+    }
+
+    // Xóa canvas
+    function clearCanvas() {
+      const canvas = document.getElementById('matrix-canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // Kiểm tra ma trận
+    function checkMatrix() {
+      const matrix = getMatrix();
+      const isREF = isRowEchelonForm(matrix);
+      const isRREF = isReducedRowEchelonForm(matrix);
+      const resultDiv = document.getElementById('result');
+
+      let resultText = '';
+      if (isRREF) {
+        resultText = 'Ma trận là ma trận bậc thang rút gọn (RREF).';
+      } else if (isREF) {
+        resultText = 'Ma trận là ma trận bậc thang (REF) nhưng không phải RREF.<br><strong>Lý do không phải RREF:</strong><ul>';
+        const reasons = explainNotRREF(matrix);
+        reasons.forEach(reason => {
+          resultText += `<li>${reason}</li>`;
+        });
+        resultText += '</ul>';
+      } else {
+        resultText = 'Ma trận không phải là ma trận bậc thang (REF) hoặc RREF.';
+      }
+      resultDiv.innerHTML = resultText;
+
+      // Hiển thị ma trận
+      displayMatrix(matrix);
+      drawMatrix(matrix);
+    }
+
+    // Khởi tạo ma trận mặc định
+    window.onload = createMatrixInput;
+  </script>
+</body>
+
+</html>
